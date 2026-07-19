@@ -84,6 +84,20 @@
     return found; // null is fine; the workflow tolerates it
   }
 
+  // ── minimal safe markdown (assistant replies only) ─────────────────────────
+  // Escape ALL HTML first, then whitelist a few inline transforms — nothing
+  // from the backend can inject markup.
+  function renderMd(s) {
+    s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    s = s.replace(/^#{1,4}[\t ]+(.+)$/gm, '<strong>$1</strong>');   // # heading → bold line
+    s = s.replace(/^[\t ]*[-*][\t ]+/gm, '• ');                     // - / * bullets → •
+    s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');               // `code`
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');       // **bold**
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,          // [text](https://…)
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    return s;
+  }
+
   // ── UI ─────────────────────────────────────────────────────────────────────
   var CSS =
     '.dgtr-app{position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;background:#fff;' +
@@ -106,6 +120,9 @@
     '.dgtr-avatar{width:28px;height:28px;border-radius:8px;background:#1f2937;color:#fff;display:flex;' +
     'align-items:center;justify-content:center;font-size:14px;flex:none;margin-top:2px}' +
     '.dgtr-bot-text{flex:1;padding-top:3px;min-width:0}' +
+    '.dgtr-bot-text code{background:#f3f4f6;border-radius:5px;padding:1px 5px;font-size:13px;' +
+    'font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}' +
+    '.dgtr-bot-text a{color:#1d4ed8}' +
     '.dgtr-typing{display:flex;gap:5px;padding:10px 0 4px}' +
     '.dgtr-typing span{width:7px;height:7px;border-radius:50%;background:#9ca3af;animation:dgtr-blink 1.2s infinite}' +
     '.dgtr-typing span:nth-child(2){animation-delay:.2s}.dgtr-typing span:nth-child(3){animation-delay:.4s}' +
@@ -216,7 +233,7 @@
       av.textContent = '💬';
       var body = document.createElement('div');
       body.className = 'dgtr-bot-text';
-      body.textContent = text;
+      body.innerHTML = renderMd(text); // safe: renderMd escapes all HTML first
       node.appendChild(av); node.appendChild(body);
     }
     els.col.appendChild(node);
