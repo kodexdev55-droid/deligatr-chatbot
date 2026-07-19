@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deligatr Assistant — local test harness</title>
+<style>
+  html,body { margin:0; padding:0; }
+  .harness { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         max-width: 640px; margin: 40px auto; padding: 0 20px; color: #111; }
+  h1 { font-size: 20px; }
+  label { display: block; margin: 14px 0 4px; font-weight: 600; font-size: 13px; }
+  input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid #d1d5db;
+         border-radius: 8px; font: inherit; box-sizing: border-box; }
+  .row { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  button { padding: 9px 16px; border: none; border-radius: 8px; background: #1f2937;
+         color: #fff; font: inherit; cursor: pointer; }
+  .hint { color: #6b7280; font-size: 13px; margin-top: 18px; line-height: 1.5; }
+  code { background: #f3f4f6; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="harness">
+<h1>Deligatr Assistant — test harness</h1>
+<p>Configure a mock GHL context, then launch the full-screen chatbot (it takes
+   over the page — reload to come back here). Serve this folder with
+   <code>python3 -m http.server</code> — opening via <code>file://</code> can
+   break fetch in some browsers.</p>
+
+<label for="endpoint">Webhook endpoint</label>
+<input type="text" id="endpoint" value="https://deligatr.app.n8n.cloud/webhook/deligatr-assistant">
+
+<label for="locationId">Mock locationId — leave blank to test real URL parsing
+  (then open this page as <code>test.html?locationId=XYZ</code>)</label>
+<input type="text" id="locationId" value="TEST_LOCATION_ID">
+
+<label for="contactId">Mock contactId (optional — blank sends null)</label>
+<input type="text" id="contactId" value="">
+
+<div class="row">
+  <input type="checkbox" id="mock">
+  <label for="mock" style="margin:0">Mock mode — intercept fetch locally, never hit the network</label>
+</div>
+
+<div class="row">
+  <button id="load">Launch chatbot</button>
+</div>
+
+<p class="hint">
+  <strong>URL parsing test:</strong> leave the mock locationId blank and open
+  <code>test.html?locationId=ABC123&amp;mock=…</code> — the app must pick <code>ABC123</code>
+  from the URL (check the <code>[dgtr] send</code> console line).<br>
+  <strong>Round-trip test:</strong> ask “how do I add a team member?” and confirm a real reply renders.<br>
+  <strong>Plan nudge:</strong> set <code>tier</code> for your mock location to <code>DeliHub Free</code> in
+  Supabase, ask for a 3rd user, expect the DeliHub Pro nudge.<br>
+  <strong>Escalation:</strong> click “Talk to a human”, then verify the Slack message + GHL task.<br>
+  To use a local mock endpoint instead of the interceptor, paste its URL
+  (e.g. <code>http://localhost:5678/webhook/deligatr-assistant</code>) into the endpoint field.
+</p>
+</div>
+
+<script>
+  document.getElementById('load').addEventListener('click', function () {
+    var endpoint = document.getElementById('endpoint').value.trim();
+    var mock = document.getElementById('mock').checked;
+
+    if (mock) {
+      // Intercept only calls to the configured endpoint; pass everything else through.
+      var realFetch = window.fetch.bind(window);
+      window.fetch = function (url, opts) {
+        if (String(url) !== endpoint) return realFetch(url, opts);
+        var body = JSON.parse((opts && opts.body) || '{}');
+        console.log('[mock] request payload:', body);
+        var q = (body.question || '').toLowerCase();
+        var reply =
+          q.indexOf('human') !== -1 || q.indexOf('team') !== -1
+            ? "No problem — I've flagged this for the team and someone will reach out shortly. (mock escalation)"
+          : q.indexOf('user') !== -1
+            ? "Your DeliHub Free plan includes 2 users. To add a 3rd, you'd want DeliHub Pro — want me to point you to the upgrade? (mock nudge)"
+            : 'Mock reply to: "' + body.question + '" (locationId=' + body.locationId +
+              ', contactId=' + body.contactId + ', history=' + (body.history || []).length + ' msgs)';
+        return new Promise(function (resolve) {
+          setTimeout(function () {
+            resolve(new Response(JSON.stringify({ reply: reply }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }));
+          }, 800); // simulate latency so the typing indicator is visible
+        });
+      };
+    }
+
+    window.DGTR_CONFIG = {
+      endpoint: endpoint,
+      // blank = no override, so the app parses locationId from this page's URL
+      locationId: document.getElementById('locationId').value.trim() || null,
+      contactId: document.getElementById('contactId').value.trim() || null,
+      debug: true,
+    };
+
+    var s = document.createElement('script');
+    s.src = 'deligatr-assistant.js?v=' + Date.now(); // cache-buster: always fresh
+    document.body.appendChild(s);
+  });
+</script>
+</body>
+</html>
