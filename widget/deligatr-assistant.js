@@ -93,7 +93,16 @@
     s = s.replace(/^[\t ]*[-*][\t ]+/gm, '• ');                     // - / * bullets → •
     s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');               // `code`
     s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');       // **bold**
-    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,          // [text](https://…)
+    // GHL booking widget links (markdown `[text](url)` OR a bare URL) → a "Book here" button.
+    // Single combined regex so the replace pass can't re-match its own output.
+    s = s.replace(
+      /\[([^\]]*)\]\((https?:\/\/api\.leadconnectorhq\.com\/widget\/booking\/[A-Za-z0-9_-]+)\)|(https?:\/\/api\.leadconnectorhq\.com\/widget\/booking\/[A-Za-z0-9_-]+)/g,
+      function (match, linkText, mdUrl, bareUrl) {
+        var url = mdUrl || bareUrl;
+        return '<a class="dgtr-book-btn" href="' + url + '" target="_blank" rel="noopener noreferrer">Book here ↗</a>';
+      }
+    );
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,          // [text](https://…) — everything else
       '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
     return s;
   }
@@ -123,6 +132,9 @@
     '.dgtr-bot-text code{background:#f3f4f6;border-radius:5px;padding:1px 5px;font-size:13px;' +
     'font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}' +
     '.dgtr-bot-text a{color:#1d4ed8}' +
+    '.dgtr-book-btn{display:inline-block;margin:6px 0 2px;padding:9px 16px;background:#1f2937;' +
+    'color:#fff!important;border-radius:10px;text-decoration:none;font-weight:600;font-size:13px}' +
+    '.dgtr-book-btn:hover{background:#111827}' +
     '.dgtr-typing{display:flex;gap:5px;padding:10px 0 4px}' +
     '.dgtr-typing span{width:7px;height:7px;border-radius:50%;background:#9ca3af;animation:dgtr-blink 1.2s infinite}' +
     '.dgtr-typing span:nth-child(2){animation-delay:.2s}.dgtr-typing span:nth-child(3){animation-delay:.4s}' +
