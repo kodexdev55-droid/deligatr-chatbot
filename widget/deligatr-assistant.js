@@ -29,7 +29,6 @@
 
   var GREETING = "Hi 👋 I'm your Deligatr assistant. Ask me anything about your account.";
   var ERROR_MSG = "I've hit a snag — please try again in a moment.";
-  var HUMAN_MSG = "I'd like to speak to someone from the team.";
   var HISTORY_CAP = 20; // last ~10 user/assistant turns
 
   var state = { busy: false, history: [] };
@@ -84,26 +83,15 @@
     return found; // null is fine; the workflow tolerates it
   }
 
-  // ── minimal safe markdown (assistant replies only) ─────────────────────────
-  // Escape ALL HTML first, then whitelist a few inline transforms — nothing
-  // from the backend can inject markup.
+  // ── minimal safe formatting (assistant replies only) ────────────────────────
+  // Escape ALL HTML first, then whitelist exactly: **bold**, *italic*, <u>underline</u>,
+  // and newlines → <br>. Nothing else from the backend can inject markup.
   function renderMd(s) {
     s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    s = s.replace(/^#{1,4}[\t ]+(.+)$/gm, '<strong>$1</strong>');   // # heading → bold line
-    s = s.replace(/^[\t ]*[-*][\t ]+/gm, '• ');                     // - / * bullets → •
-    s = s.replace(/`([^`\n]+)`/g, '<code>$1</code>');               // `code`
-    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');       // **bold**
-    // GHL booking widget links (markdown `[text](url)` OR a bare URL) → a "Book here" button.
-    // Single combined regex so the replace pass can't re-match its own output.
-    s = s.replace(
-      /\[([^\]]*)\]\((https?:\/\/api\.leadconnectorhq\.com\/widget\/booking\/[A-Za-z0-9_-]+)\)|(https?:\/\/api\.leadconnectorhq\.com\/widget\/booking\/[A-Za-z0-9_-]+)/g,
-      function (match, linkText, mdUrl, bareUrl) {
-        var url = mdUrl || bareUrl;
-        return '<a class="dgtr-book-btn" href="' + url + '" target="_blank" rel="noopener noreferrer">Book here ↗</a>';
-      }
-    );
-    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,          // [text](https://…) — everything else
-      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    s = s.replace(/&lt;u&gt;/g, '<u>').replace(/&lt;\/u&gt;/g, '</u>'); // re-allow <u>
+    s = s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');        // **bold**
+    s = s.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');                    // *italic*
+    s = s.replace(/\n/g, '<br>');                                     // newlines; "• " lines pass through as-is
     return s;
   }
 
@@ -117,9 +105,6 @@
     '.dgtr-logo{width:30px;height:30px;border-radius:8px;background:#1f2937;color:#fff;display:flex;' +
     'align-items:center;justify-content:center;font-size:16px;flex:none}' +
     '.dgtr-head-title{flex:1;font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-    '.dgtr-human{background:#f3f4f6;color:#111;border:1px solid #e5e7eb;border-radius:10px;cursor:pointer;' +
-    'font-size:13px;padding:8px 14px;font-family:inherit;flex:none}' +
-    '.dgtr-human:hover{background:#e5e7eb}' +
     '.dgtr-msgs{flex:1;overflow-y:auto;background:#fff}' +
     '.dgtr-col{max-width:768px;margin:0 auto;padding:28px 20px 12px;display:flex;flex-direction:column;gap:18px}' +
     '.dgtr-msg{white-space:pre-wrap;word-wrap:break-word}' +
@@ -128,13 +113,11 @@
     '.dgtr-msg-bot{align-self:stretch;display:flex;gap:12px}' +
     '.dgtr-avatar{width:28px;height:28px;border-radius:8px;background:#1f2937;color:#fff;display:flex;' +
     'align-items:center;justify-content:center;font-size:14px;flex:none;margin-top:2px}' +
-    '.dgtr-bot-text{flex:1;padding-top:3px;min-width:0}' +
-    '.dgtr-bot-text code{background:#f3f4f6;border-radius:5px;padding:1px 5px;font-size:13px;' +
-    'font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}' +
-    '.dgtr-bot-text a{color:#1d4ed8}' +
-    '.dgtr-book-btn{display:inline-block;margin:6px 0 2px;padding:9px 16px;background:#1f2937;' +
-    'color:#fff!important;border-radius:10px;text-decoration:none;font-weight:600;font-size:13px}' +
-    '.dgtr-book-btn:hover{background:#111827}' +
+    '.dgtr-bot-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:8px}' +
+    '.dgtr-bot-text{padding-top:3px;min-width:0;align-self:stretch}' +
+    '.dgtr-talk-btn{background:#f3f4f6;color:#111;border:1px solid #e5e7eb;border-radius:8px;' +
+    'cursor:pointer;font-size:12px;padding:7px 13px;font-family:inherit;flex:none}' +
+    '.dgtr-talk-btn:hover{background:#e5e7eb}' +
     '.dgtr-typing{display:flex;gap:5px;padding:10px 0 4px}' +
     '.dgtr-typing span{width:7px;height:7px;border-radius:50%;background:#9ca3af;animation:dgtr-blink 1.2s infinite}' +
     '.dgtr-typing span:nth-child(2){animation-delay:.2s}.dgtr-typing span:nth-child(3){animation-delay:.4s}' +
@@ -167,12 +150,7 @@
     var title = document.createElement('div');
     title.className = 'dgtr-head-title';
     title.textContent = 'Deligatr Assistant';
-    els.human = document.createElement('button');
-    els.human.className = 'dgtr-human';
-    els.human.type = 'button';
-    els.human.textContent = 'Talk to a human';
-    els.human.addEventListener('click', function () { send(HUMAN_MSG); });
-    head.appendChild(logo); head.appendChild(title); head.appendChild(els.human);
+    head.appendChild(logo); head.appendChild(title);
 
     els.msgs = document.createElement('div');
     els.msgs.className = 'dgtr-msgs';
@@ -231,7 +209,7 @@
     send(q);
   }
 
-  function addMsg(role, text, skipHistory) {
+  function addMsg(role, text, skipHistory, offerCall, bookingUrl) {
     var node;
     if (role === 'user') {
       node = document.createElement('div');
@@ -243,10 +221,21 @@
       var av = document.createElement('div');
       av.className = 'dgtr-avatar';
       av.textContent = '💬';
+      var col = document.createElement('div');
+      col.className = 'dgtr-bot-col';
       var body = document.createElement('div');
       body.className = 'dgtr-bot-text';
       body.innerHTML = renderMd(text); // safe: renderMd escapes all HTML first
-      node.appendChild(av); node.appendChild(body);
+      col.appendChild(body);
+      if (offerCall && typeof bookingUrl === 'string' && bookingUrl) {
+        var talkBtn = document.createElement('button');
+        talkBtn.type = 'button';
+        talkBtn.className = 'dgtr-talk-btn';
+        talkBtn.textContent = 'Talk to a human';
+        talkBtn.addEventListener('click', function () { window.open(bookingUrl, '_blank'); });
+        col.appendChild(talkBtn);
+      }
+      node.appendChild(av); node.appendChild(col);
     }
     els.col.appendChild(node);
     els.msgs.scrollTop = els.msgs.scrollHeight;
@@ -303,8 +292,10 @@
       })
       .then(function (data) {
         var reply = data && typeof data.reply === 'string' && data.reply ? data.reply : ERROR_MSG;
+        var offerCall = !!(data && data.offer_call === true);
+        var bookingUrl = data && data.booking_url;
         setTyping(false);
-        addMsg('assistant', reply);
+        addMsg('assistant', reply, false, offerCall, bookingUrl);
       })
       .catch(function (err) {
         log('request failed', err && err.message);
