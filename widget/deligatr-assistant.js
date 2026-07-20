@@ -144,11 +144,18 @@
     '.dgtr-form{display:flex;align-items:flex-end;gap:8px;border:1px solid #d3c2e8;border-radius:14px;' +
     'padding:8px 8px 8px 13px;background:#fff}' +
     '.dgtr-form:focus-within{border-color:' + PURPLE + '}' +
-    '.dgtr-input{flex:1;border:none;outline:none;resize:none;font:inherit;background:transparent;' +
-    'max-height:120px;min-width:0;padding:3px 0}' +
+    '.dgtr-input{flex:1;border:none;outline:none!important;box-shadow:none!important;resize:none;' +
+    'font:inherit;background:transparent;max-height:120px;min-width:0;padding:3px 0}' +
+    '.dgtr-input:focus{outline:none!important;box-shadow:none!important}' +
     '.dgtr-send{border:none;border-radius:9px;background:#1c1030;color:' + GREEN + ';width:34px;height:34px;' +
     'cursor:pointer;font-size:16px;font-weight:700;flex:none;display:flex;align-items:center;justify-content:center}' +
-    '.dgtr-send:disabled{opacity:.4;cursor:default}';
+    '.dgtr-send:disabled{opacity:.4;cursor:default}' +
+    // GHL's own focus-ring styles are aggressive enough to leak through onto our
+    // controls; suppress the default outline and substitute a branded one that
+    // only shows for keyboard navigation (:focus-visible), not mouse clicks.
+    '.dgtr-bubble,.dgtr-close,.dgtr-talk-btn,.dgtr-send{outline:none!important}' +
+    '.dgtr-bubble:focus-visible,.dgtr-close:focus-visible,.dgtr-talk-btn:focus-visible,' +
+    '.dgtr-send:focus-visible{box-shadow:0 0 0 2px ' + GREEN + '!important}';
 
   function build() {
     var style = document.createElement('style');
