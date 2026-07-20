@@ -22,8 +22,8 @@
 <body>
 <div class="harness">
 <h1>Deligatr Assistant — test harness</h1>
-<p>Configure a mock GHL context, then launch the full-screen chatbot (it takes
-   over the page — reload to come back here). Serve this folder with
+<p>Configure a mock GHL context, then load the widget — a chat bubble appears
+   bottom-right, same as it will in a real sub-account. Serve this folder with
    <code>python3 -m http.server</code> — opening via <code>file://</code> can
    break fetch in some browsers.</p>
 
@@ -43,17 +43,20 @@
 </div>
 
 <div class="row">
-  <button id="load">Launch chatbot</button>
+  <button id="load">Load widget</button>
 </div>
 
 <p class="hint">
   <strong>URL parsing test:</strong> leave the mock locationId blank and open
   <code>test.html?locationId=ABC123&amp;mock=…</code> — the app must pick <code>ABC123</code>
   from the URL (check the <code>[dgtr] send</code> console line).<br>
-  <strong>Round-trip test:</strong> ask “how do I add a team member?” and confirm a real reply renders.<br>
+  <strong>Round-trip test:</strong> click the bubble, ask “how do I add a team member?”, confirm a real reply renders.<br>
   <strong>Plan nudge:</strong> set <code>tier</code> for your mock location to <code>DeliHub Free</code> in
   Supabase, ask for a 3rd user, expect the DeliHub Pro nudge.<br>
-  <strong>Escalation:</strong> click “Talk to a human”, then verify the Slack message + GHL task.<br>
+  <strong>Escalation:</strong> ask something mentioning “human” or “team” — the reply should carry
+  <code>offer_call: true</code>, showing a small “Talk to a human” button under that message; clicking it
+  opens <code>booking_url</code> in a new tab (no extra webhook call). Verify the real backend also fires
+  the Slack message + GHL task for this case.<br>
   To use a local mock endpoint instead of the interceptor, paste its URL
   (e.g. <code>http://localhost:5678/webhook/deligatr-assistant</code>) into the endpoint field.
 </p>
@@ -72,16 +75,28 @@
         var body = JSON.parse((opts && opts.body) || '{}');
         console.log('[mock] request payload:', body);
         var q = (body.question || '').toLowerCase();
-        var reply =
-          q.indexOf('human') !== -1 || q.indexOf('team') !== -1
-            ? "No problem — I've flagged this for the team and someone will reach out shortly. (mock escalation)"
+        var isEscalation = q.indexOf('human') !== -1 || q.indexOf('team') !== -1;
+        var resp = isEscalation
+          ? {
+              reply: "No problem — I've **flagged this for the team** and someone will reach out shortly. " +
+                "You can also *grab a time yourself* if that's faster. (mock escalation)",
+              offer_call: true,
+              booking_url: 'https://api.leadconnectorhq.com/widget/booking/HBFkOaHxEpVylHNceHFs',
+            }
           : q.indexOf('user') !== -1
-            ? "Your DeliHub Free plan includes 2 users. To add a 3rd, you'd want DeliHub Pro — want me to point you to the upgrade? (mock nudge)"
-            : 'Mock reply to: "' + body.question + '" (locationId=' + body.locationId +
-              ', contactId=' + body.contactId + ', history=' + (body.history || []).length + ' msgs)';
+          ? {
+              reply: 'Your DeliHub Free plan includes <u>2 users</u>. To add a 3rd, you\'d want ' +
+                '**DeliHub Pro** — want me to point you to the upgrade? (mock nudge)',
+              offer_call: false,
+            }
+          : {
+              reply: 'Mock reply to: "' + body.question + '" (locationId=' + body.locationId +
+                ', contactId=' + body.contactId + ', history=' + (body.history || []).length + ' msgs)',
+              offer_call: false,
+            };
         return new Promise(function (resolve) {
           setTimeout(function () {
-            resolve(new Response(JSON.stringify({ reply: reply }),
+            resolve(new Response(JSON.stringify(resp),
               { status: 200, headers: { 'Content-Type': 'application/json' } }));
           }, 800); // simulate latency so the typing indicator is visible
         });

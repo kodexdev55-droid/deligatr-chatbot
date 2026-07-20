@@ -1,7 +1,7 @@
 /**
- * Deligatr Assistant — full-screen chatbot for DeliHub (GHL) clients.
- * Renders a ChatGPT/Claude-style full-page chat UI into the host page.
- * Vanilla JS, no dependencies, everything namespaced `dgtr-`.
+ * Deligatr Assistant — floating chat widget for DeliHub (GHL) clients.
+ * Injects a bubble (bottom-right) that opens a chat panel, ChatGPT/Claude-style
+ * formatting inside. Vanilla JS, no dependencies, everything namespaced `dgtr-`.
  * History is in-memory only (resets on reload — intentional, see README).
  *
  * locationId resolution order (re-checked on every send):
@@ -31,7 +31,7 @@
   var ERROR_MSG = "I've hit a snag — please try again in a moment.";
   var HISTORY_CAP = 20; // last ~10 user/assistant turns
 
-  var state = { busy: false, history: [] };
+  var state = { open: false, busy: false, history: [] };
   var els = {};
 
   function log() {
@@ -96,51 +96,69 @@
   }
 
   // ── UI ─────────────────────────────────────────────────────────────────────
+  var FONT = 'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;';
   var CSS =
-    '.dgtr-app{position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;background:#fff;' +
-    'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;' +
-    'font-size:15px;color:#111;line-height:1.55}' +
-    '.dgtr-head{display:flex;align-items:center;gap:10px;padding:0 20px;height:58px;flex:none;' +
-    'border-bottom:1px solid #e7e7e9;background:#fff}' +
-    '.dgtr-logo{width:30px;height:30px;border-radius:8px;background:#1f2937;color:#fff;display:flex;' +
-    'align-items:center;justify-content:center;font-size:16px;flex:none}' +
-    '.dgtr-head-title{flex:1;font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
-    '.dgtr-msgs{flex:1;overflow-y:auto;background:#fff}' +
-    '.dgtr-col{max-width:768px;margin:0 auto;padding:28px 20px 12px;display:flex;flex-direction:column;gap:18px}' +
+    '.dgtr-bubble{position:fixed;right:20px;bottom:20px;z-index:2147483000;width:58px;height:58px;' +
+    'border-radius:50%;border:none;cursor:pointer;background:#1f2937;color:#fff;font-size:26px;' +
+    'box-shadow:0 4px 16px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center;' +
+    'transition:transform .15s ease}' +
+    '.dgtr-bubble:hover{transform:scale(1.06)}' +
+    '.dgtr-panel{position:fixed;right:20px;bottom:90px;z-index:2147483000;width:380px;max-width:calc(100vw - 32px);' +
+    'height:600px;max-height:calc(100vh - 120px);background:#fff;border-radius:16px;overflow:hidden;' +
+    'box-shadow:0 12px 44px rgba(0,0,0,.3);display:none;flex-direction:column;' +
+    FONT + 'font-size:14.5px;color:#111;line-height:1.5}' +
+    '.dgtr-panel.dgtr-open{display:flex}' +
+    '.dgtr-head{display:flex;align-items:center;gap:10px;padding:0 14px;height:56px;flex:none;' +
+    'background:#1f2937;color:#fff}' +
+    '.dgtr-logo{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.15);color:#fff;' +
+    'display:flex;align-items:center;justify-content:center;font-size:15px;flex:none}' +
+    '.dgtr-head-title{flex:1;font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.dgtr-close{background:rgba(255,255,255,.14);color:#fff;border:none;border-radius:8px;' +
+    'cursor:pointer;font-size:14px;line-height:1;padding:7px 9px;flex:none}' +
+    '.dgtr-close:hover{background:rgba(255,255,255,.26)}' +
+    '.dgtr-msgs{flex:1;overflow-y:auto;background:#f6f7f9}' +
+    '.dgtr-col{padding:16px 14px;display:flex;flex-direction:column;gap:14px}' +
     '.dgtr-msg{white-space:pre-wrap;word-wrap:break-word}' +
-    '.dgtr-msg-user{align-self:flex-end;max-width:80%;background:#f3f4f6;border-radius:16px;' +
-    'border-bottom-right-radius:6px;padding:11px 16px}' +
-    '.dgtr-msg-bot{align-self:stretch;display:flex;gap:12px}' +
-    '.dgtr-avatar{width:28px;height:28px;border-radius:8px;background:#1f2937;color:#fff;display:flex;' +
-    'align-items:center;justify-content:center;font-size:14px;flex:none;margin-top:2px}' +
-    '.dgtr-bot-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:8px}' +
-    '.dgtr-bot-text{padding-top:3px;min-width:0;align-self:stretch}' +
-    '.dgtr-talk-btn{background:#f3f4f6;color:#111;border:1px solid #e5e7eb;border-radius:8px;' +
-    'cursor:pointer;font-size:12px;padding:7px 13px;font-family:inherit;flex:none}' +
-    '.dgtr-talk-btn:hover{background:#e5e7eb}' +
-    '.dgtr-typing{display:flex;gap:5px;padding:10px 0 4px}' +
-    '.dgtr-typing span{width:7px;height:7px;border-radius:50%;background:#9ca3af;animation:dgtr-blink 1.2s infinite}' +
+    '.dgtr-msg-user{align-self:flex-end;max-width:85%;background:#1f2937;color:#fff;border-radius:14px;' +
+    'border-bottom-right-radius:4px;padding:9px 13px}' +
+    '.dgtr-msg-bot{align-self:stretch;display:flex;gap:8px}' +
+    '.dgtr-avatar{width:24px;height:24px;border-radius:7px;background:#1f2937;color:#fff;display:flex;' +
+    'align-items:center;justify-content:center;font-size:12px;flex:none;margin-top:2px}' +
+    '.dgtr-bot-col{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:7px}' +
+    '.dgtr-bot-text{background:#fff;border:1px solid #e5e7eb;border-radius:14px;border-top-left-radius:4px;' +
+    'padding:9px 13px;min-width:0;align-self:stretch}' +
+    '.dgtr-talk-btn{background:#fff;color:#111;border:1px solid #d1d5db;border-radius:8px;' +
+    'cursor:pointer;font-size:12px;padding:6px 12px;font-family:inherit;flex:none}' +
+    '.dgtr-talk-btn:hover{background:#f3f4f6}' +
+    '.dgtr-typing{display:flex;gap:5px;background:#fff;border:1px solid #e5e7eb;border-radius:14px;' +
+    'border-top-left-radius:4px;padding:11px 14px}' +
+    '.dgtr-typing span{width:6px;height:6px;border-radius:50%;background:#9ca3af;animation:dgtr-blink 1.2s infinite}' +
     '.dgtr-typing span:nth-child(2){animation-delay:.2s}.dgtr-typing span:nth-child(3){animation-delay:.4s}' +
     '@keyframes dgtr-blink{0%,80%,100%{opacity:.3}40%{opacity:1}}' +
-    '.dgtr-inputwrap{flex:none;padding:8px 20px 22px;background:#fff}' +
-    '.dgtr-form{max-width:768px;margin:0 auto;display:flex;align-items:flex-end;gap:10px;' +
-    'border:1px solid #d1d5db;border-radius:16px;padding:10px 10px 10px 16px;background:#fff;' +
-    'box-shadow:0 2px 12px rgba(0,0,0,.06)}' +
+    '.dgtr-inputwrap{flex:none;padding:10px;background:#fff;border-top:1px solid #e5e7eb}' +
+    '.dgtr-form{display:flex;align-items:flex-end;gap:8px;border:1px solid #d1d5db;border-radius:14px;' +
+    'padding:8px 8px 8px 13px;background:#fff}' +
     '.dgtr-form:focus-within{border-color:#1f2937}' +
     '.dgtr-input{flex:1;border:none;outline:none;resize:none;font:inherit;background:transparent;' +
-    'max-height:170px;min-width:0;padding:4px 0}' +
-    '.dgtr-send{border:none;border-radius:10px;background:#1f2937;color:#fff;width:38px;height:38px;' +
-    'cursor:pointer;font-size:16px;flex:none;display:flex;align-items:center;justify-content:center}' +
-    '.dgtr-send:disabled{opacity:.4;cursor:default}' +
-    '.dgtr-hint{max-width:768px;margin:8px auto 0;text-align:center;color:#9ca3af;font-size:12px}';
+    'max-height:120px;min-width:0;padding:3px 0}' +
+    '.dgtr-send{border:none;border-radius:9px;background:#1f2937;color:#fff;width:34px;height:34px;' +
+    'cursor:pointer;font-size:15px;flex:none;display:flex;align-items:center;justify-content:center}' +
+    '.dgtr-send:disabled{opacity:.4;cursor:default}';
 
   function build() {
     var style = document.createElement('style');
     style.textContent = CSS;
     document.head.appendChild(style);
 
-    els.app = document.createElement('div');
-    els.app.className = 'dgtr-app';
+    els.bubble = document.createElement('button');
+    els.bubble.className = 'dgtr-bubble';
+    els.bubble.type = 'button';
+    els.bubble.setAttribute('aria-label', 'Open Deligatr assistant');
+    els.bubble.textContent = '💬';
+    els.bubble.addEventListener('click', toggle);
+
+    els.panel = document.createElement('div');
+    els.panel.className = 'dgtr-panel';
 
     var head = document.createElement('div');
     head.className = 'dgtr-head';
@@ -150,7 +168,13 @@
     var title = document.createElement('div');
     title.className = 'dgtr-head-title';
     title.textContent = 'Deligatr Assistant';
-    head.appendChild(logo); head.appendChild(title);
+    var close = document.createElement('button');
+    close.className = 'dgtr-close';
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Close');
+    close.textContent = '✕';
+    close.addEventListener('click', toggle);
+    head.appendChild(logo); head.appendChild(title); head.appendChild(close);
 
     els.msgs = document.createElement('div');
     els.msgs.className = 'dgtr-msgs';
@@ -165,7 +189,7 @@
     els.input = document.createElement('textarea');
     els.input.className = 'dgtr-input';
     els.input.rows = 1;
-    els.input.placeholder = 'Ask anything about your account…';
+    els.input.placeholder = 'Type your question…';
     els.input.setAttribute('maxlength', '2000');
     els.input.addEventListener('input', autosize);
     els.input.addEventListener('keydown', function (e) {
@@ -181,24 +205,27 @@
     els.sendBtn.textContent = '↑';
     form.appendChild(els.input); form.appendChild(els.sendBtn);
     form.addEventListener('submit', function (e) { e.preventDefault(); submit(); });
-    var hint = document.createElement('div');
-    hint.className = 'dgtr-hint';
-    hint.textContent = 'Enter to send · Shift+Enter for a new line';
-    wrap.appendChild(form); wrap.appendChild(hint);
+    wrap.appendChild(form);
 
     els.form = form;
-    els.app.appendChild(head);
-    els.app.appendChild(els.msgs);
-    els.app.appendChild(wrap);
-    document.body.appendChild(els.app);
+    els.panel.appendChild(head);
+    els.panel.appendChild(els.msgs);
+    els.panel.appendChild(wrap);
+    document.body.appendChild(els.bubble);
+    document.body.appendChild(els.panel);
 
     addMsg('assistant', GREETING, /*skipHistory*/ true);
-    els.input.focus();
+  }
+
+  function toggle() {
+    state.open = !state.open;
+    els.panel.className = 'dgtr-panel' + (state.open ? ' dgtr-open' : '');
+    if (state.open) els.input.focus();
   }
 
   function autosize() {
     els.input.style.height = 'auto';
-    els.input.style.height = Math.min(els.input.scrollHeight, 170) + 'px';
+    els.input.style.height = Math.min(els.input.scrollHeight, 120) + 'px';
   }
 
   function submit() {

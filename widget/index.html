@@ -8,11 +8,12 @@
 </head>
 <body>
 <!--
-  Full-screen Deligatr Assistant.
-  Link to this page from GHL with the location id in the URL, e.g. a custom
-  menu link:  https://<your-host>/index.html?locationId={{location.id}}
-  The app also falls back to /location/<id>/ in the path or the referrer.
+  Standalone demo page for the Deligatr Assistant chat bubble.
+  In production this script is injected agency-wide via GHL Custom JS (see
+  README), so it runs on every sub-account page rather than a dedicated page.
+  This file exists so the bubble can be tested outside GHL — open it directly,
+  or add ?locationId=<id> to test URL parsing without GHL's own path/referrer.
 -->
-<script src="deligatr-assistant.js?v=5" defer></script>
+<script src="deligatr-assistant.js?v=6" defer></script>
 </body>
 </html>
