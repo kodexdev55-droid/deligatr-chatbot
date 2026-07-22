@@ -91,12 +91,15 @@ App behavior notes:
 - Failures degrade silently: network/HTTP errors render "I've hit a snag —
   please try again in a moment." and never throw into the host console. Error
   messages are not added to history sent to the backend.
-- The webhook response is `{ reply, offer_call, booking_url }`. Replies render
-  through a small safe formatter (HTML escaped first, then only `**bold**`,
-  `*italic*`, `<u>underline</u>`, and newlines are turned into markup — nothing
-  else from the backend can inject HTML). When `offer_call === true`, a small
-  "Talk to a human" button renders under that specific reply; clicking it opens
-  `booking_url` in a new tab directly — no extra webhook call.
+- The webhook response is `{ reply, offer_call, booking_url, checkout_url,
+  upgrade_plan }`. Replies render through a small safe formatter (HTML escaped
+  first, then only `**bold**`, `*italic*`, `<u>underline</u>`, and newlines are
+  turned into markup — nothing else from the backend can inject HTML). When
+  `offer_call === true`, a secondary "Talk to a human" button renders under
+  that specific reply, opening `booking_url` in a new tab. When `checkout_url`
+  is present, a filled/primary "Pay" button renders under that reply, opening
+  `checkout_url` in a new tab (a Stripe payment link) — no extra webhook call
+  for either button. Both can appear together on the same message.
 
 ## 3. Local testing
 
