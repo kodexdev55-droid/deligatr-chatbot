@@ -143,6 +143,9 @@
     '.dgtr-pay-btn{background:' + GREEN + ';color:#12081f;border:none;border-radius:8px;font-weight:700;' +
     'cursor:pointer;font-size:12px;padding:7px 14px;font-family:inherit;flex:none}' +
     '.dgtr-pay-btn:hover{background:#2ec870}' +
+    '.dgtr-download-btn{background:#fff;color:' + PURPLE + ';border:1px solid #d3c2e8;border-radius:8px;' +
+    'cursor:pointer;font-size:12px;padding:6px 12px;font-family:inherit;flex:none}' +
+    '.dgtr-download-btn:hover{background:#f3edfb}' +
     '.dgtr-typing{display:flex;gap:5px;background:#fff;border:1px solid #e6def2;border-radius:14px;' +
     'border-top-left-radius:4px;padding:11px 14px}' +
     '.dgtr-typing span{width:6px;height:6px;border-radius:50%;background:#a892c4;animation:dgtr-blink 1.2s infinite}' +
@@ -162,9 +165,9 @@
     // GHL's own focus-ring styles are aggressive enough to leak through onto our
     // controls; suppress the default outline and substitute a branded one that
     // only shows for keyboard navigation (:focus-visible), not mouse clicks.
-    '.dgtr-bubble,.dgtr-close,.dgtr-talk-btn,.dgtr-pay-btn,.dgtr-send{outline:none!important}' +
+    '.dgtr-bubble,.dgtr-close,.dgtr-talk-btn,.dgtr-pay-btn,.dgtr-download-btn,.dgtr-send{outline:none!important}' +
     '.dgtr-bubble:focus-visible,.dgtr-close:focus-visible,.dgtr-talk-btn:focus-visible,' +
-    '.dgtr-send:focus-visible{box-shadow:0 0 0 2px ' + GREEN + '!important}' +
+    '.dgtr-download-btn:focus-visible,.dgtr-send:focus-visible{box-shadow:0 0 0 2px ' + GREEN + '!important}' +
     '.dgtr-pay-btn:focus-visible{box-shadow:0 0 0 2px ' + PURPLE + '!important}';
 
   function build() {
@@ -261,7 +264,7 @@
     send(q);
   }
 
-  function addMsg(role, text, skipHistory, offerCall, bookingUrl, checkoutUrl) {
+  function addMsg(role, text, skipHistory, offerCall, bookingUrl, checkoutUrl, downloadUrl) {
     var node;
     if (role === 'user') {
       node = document.createElement('div');
@@ -286,6 +289,14 @@
         payBtn.textContent = 'Pay';
         payBtn.addEventListener('click', function () { window.open(checkoutUrl, '_blank'); });
         col.appendChild(payBtn);
+      }
+      if (typeof downloadUrl === 'string' && downloadUrl) {
+        var downloadBtn = document.createElement('button');
+        downloadBtn.type = 'button';
+        downloadBtn.className = 'dgtr-download-btn';
+        downloadBtn.textContent = 'Download example CSV';
+        downloadBtn.addEventListener('click', function () { window.open(downloadUrl, '_blank'); });
+        col.appendChild(downloadBtn);
       }
       if (offerCall && typeof bookingUrl === 'string' && bookingUrl) {
         var talkBtn = document.createElement('button');
@@ -355,9 +366,10 @@
         var offerCall = !!(data && data.offer_call === true);
         var bookingUrl = data && data.booking_url;
         var checkoutUrl = data && data.checkout_url;
+        var downloadUrl = data && data.download_url;
         if (checkoutUrl) log('checkout offered', data.upgrade_plan, checkoutUrl);
         setTyping(false);
-        addMsg('assistant', reply, false, offerCall, bookingUrl, checkoutUrl);
+        addMsg('assistant', reply, false, offerCall, bookingUrl, checkoutUrl, downloadUrl);
       })
       .catch(function (err) {
         log('request failed', err && err.message);
