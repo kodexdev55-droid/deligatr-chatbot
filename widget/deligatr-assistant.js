@@ -362,6 +362,9 @@
         return res.json();
       })
       .then(function (data) {
+        // n8n sometimes responds with an array of items instead of a bare
+        // object; unwrap the first item so field access below works either way.
+        if (Array.isArray(data)) data = data[0];
         var reply = data && typeof data.reply === 'string' && data.reply ? data.reply : ERROR_MSG;
         var offerCall = !!(data && data.offer_call === true);
         var bookingUrl = data && data.booking_url;
