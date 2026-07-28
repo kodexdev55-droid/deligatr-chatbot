@@ -10,7 +10,7 @@
  * Fill in the real GHL location ids below first (Settings → Business Profile
  * in each sub-account, or copy from the sub-account URL: .../location/<ID>/...).
  * The script refuses to run while any REPLACE_ME placeholder remains.
- *
+ 
  * Re-runnable: existing rows are skipped (ignore-duplicates), so re-seeding
  * never resets a tier you've since bumped. To change a tier, use SQL or the
  * Supabase table editor (see README).
