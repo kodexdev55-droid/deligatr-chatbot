@@ -75,6 +75,17 @@ App behavior notes:
 
 - Everything is namespaced `dgtr-` (CSS classes, one `window.__dgtrLoaded` guard)
   so it can't collide with GHL styles.
+- The launcher floats at `bottom:90px; right:24px` rather than hugging the
+  bottom edge: GHL list views (Contacts, Opportunities…) pin a pagination row
+  with Prev/Next to the bottom-right, and the old `bottom:20px` bubble covered
+  it. The open panel stacks above the bubble at `bottom:172px`. Those numbers
+  come from `SIDE` / `BOTTOM` / `BUBBLE` / `PANEL_BOTTOM` at the top of the CSS
+  block — **keep `BOTTOM` at 80 or higher**, that's the clearance the pagination
+  row needs.
+- The bubble carries a small ✕ (visible only while the panel is closed) that
+  tucks the widget away into a thin tab flush against the right edge; clicking
+  the tab brings it back. In-memory only, like history — a hard reload restores
+  the bubble. Tucking while the panel is open closes the panel on the way out.
 - `locationId` is resolved from the URL on **every send** (GHL is a SPA and
   the URL changes without a reload), in this order: `?locationId=` /
   `?location_id=` query param → `/location/<id>/` in the path →
@@ -139,3 +150,7 @@ python3 -m http.server 8080
       console errors, and a sent message carries the correct `locationId`
       (check the workflow execution log, or `debug: true` + the `[dgtr] send`
       console line).
+- [ ] On a **Contacts list view** (pagination pinned bottom-right): the bubble
+      sits clear of the Prev/Next buttons and both are still clickable, opening
+      the panel doesn't cover them either, and the ✕ tucks the widget to the
+      edge tab / the tab restores it.
