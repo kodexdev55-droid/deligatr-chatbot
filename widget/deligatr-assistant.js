@@ -115,7 +115,7 @@
     // The launcher wraps bubble + hide button so both move together and the
     // hide button can be absolutely placed against the bubble (a <button>
     // cannot legally nest inside another <button>).
-    '.dgtr-launcher{position:fixed;right:' + SIDE + 'px;bottom:' + BOTTOM + 'px;z-index:2147483000;' +
+    '.dgtr-launcher{position:fixed;right:' + SIDE + 'px;bottom:' + BOTTOM + 'px;z-index:2147483647;' +
     'width:' + BUBBLE + 'px;height:' + BUBBLE + 'px}' +
     '.dgtr-launcher.dgtr-tucked{display:none}' +
     '.dgtr-bubble{position:relative;width:100%;height:100%;' +
@@ -134,7 +134,7 @@
     '.dgtr-hide:hover{background:#f3edfb;color:' + PURPLE + '}' +
     // Tucked-away state: a thin tab flush against the right edge, same bottom
     // offset so it never lands on the pagination row either.
-    '.dgtr-tab{position:fixed;right:0;bottom:' + BOTTOM + 'px;z-index:2147483000;display:none;' +
+    '.dgtr-tab{position:fixed;right:0;bottom:' + BOTTOM + 'px;z-index:2147483647;display:none;' +
     'width:16px;height:56px;border:none;border-radius:8px 0 0 8px;cursor:pointer;padding:0;' +
     'background:' + GRADIENT + ';color:#fff;font-size:11px;line-height:1;' +
     'align-items:center;justify-content:center;font-family:inherit;' +
@@ -144,7 +144,7 @@
     '@keyframes dgtr-buzz{0%,100%{transform:rotate(0)}2%{transform:rotate(-11deg)}4%{transform:rotate(10deg)}' +
     '6%{transform:rotate(-8deg)}8%{transform:rotate(7deg)}10%{transform:rotate(-4deg)}12%{transform:rotate(0)}}' +
     '@media (prefers-reduced-motion:no-preference){.dgtr-bubble.dgtr-buzzing{animation:dgtr-buzz 6s ease-in-out infinite}}' +
-    '.dgtr-panel{position:fixed;right:' + SIDE + 'px;bottom:' + PANEL_BOTTOM + 'px;z-index:2147483000;' +
+    '.dgtr-panel{position:fixed;right:' + SIDE + 'px;bottom:' + PANEL_BOTTOM + 'px;z-index:2147483647;' +
     'width:380px;max-width:calc(100vw - 32px);' +
     'height:600px;max-height:calc(100vh - ' + (PANEL_BOTTOM + 20) + 'px);background:#fff;border-radius:16px;overflow:hidden;' +
     'box-shadow:0 12px 44px rgba(20,10,34,.35);display:none;flex-direction:column;' +
@@ -217,7 +217,7 @@
     els.bubble.type = 'button';
     els.bubble.setAttribute('aria-label', 'Open Deligatr assistant');
     els.bubble.innerHTML = LOGO_IMG_HTML;
-    els.bubble.addEventListener('click', toggle);
+    els.bubble.addEventListener('click', togglePanel);
 
     els.hide = document.createElement('button');
     els.hide.className = 'dgtr-hide';
@@ -256,7 +256,8 @@
     close.type = 'button';
     close.setAttribute('aria-label', 'Close');
     close.textContent = '✕';
-    close.addEventListener('click', toggle);
+    close.addEventListener('click', closePanel);
+    els.close = close;
     head.appendChild(logo); head.appendChild(title); head.appendChild(close);
 
     els.msgs = document.createElement('div');
@@ -298,18 +299,42 @@
     document.body.appendChild(els.tab);
     document.body.appendChild(els.panel);
 
+    // Escape always closes, even when the ✕ itself is unreachable — a host-page
+    // overlay sitting above us, or a focus trap that eats the click. Capture
+    // phase so GHL can't swallow the key before it reaches us.
+    document.addEventListener('keydown', function (e) {
+      if ((e.key === 'Escape' || e.key === 'Esc') && isPanelOpen()) {
+        e.stopPropagation();
+        closePanel();
+      }
+    }, true);
+
     addMsg('assistant', GREETING, /*skipHistory*/ true);
   }
 
-  function toggle() {
-    state.open = !state.open;
-    els.panel.className = 'dgtr-panel' + (state.open ? ' dgtr-open' : '');
-    els.launcher.classList.toggle('dgtr-panel-open', state.open);
-    if (state.open) {
-      els.input.focus();
-      els.bubble.classList.remove('dgtr-buzzing'); // stop once they've engaged with it
-    }
+  // Open/closed is derived from the DOM, never from a cached boolean. A toggle
+  // that trusts `state.open` turns the next click into a no-op the moment the
+  // flag drifts out of sync with what's on screen (a host-page re-render, a
+  // swallowed build error, a second copy of this script) — and since the ✕ and
+  // the bubble shared that one toggle, both would appear dead at once and the
+  // panel read as stuck open. `state.open` is kept for logging only.
+  function isPanelOpen() {
+    return !!els.panel && els.panel.classList.contains('dgtr-open');
   }
+
+  function setPanelOpen(open) {
+    state.open = open;
+    els.panel.classList[open ? 'add' : 'remove']('dgtr-open');
+    els.launcher.classList.toggle('dgtr-panel-open', open);
+    els.bubble.classList.remove('dgtr-buzzing'); // stop once they've engaged with it
+    if (open) els.input.focus();
+    log('panel', open ? 'open' : 'closed');
+  }
+
+  // The ✕ closes — it is never a toggle. However desynced things get, one click
+  // on it always lands the panel in the closed state.
+  function closePanel() { setPanelOpen(false); }
+  function togglePanel() { setPanelOpen(!isPanelOpen()); }
 
   // Tucking away collapses the launcher to a thin edge tab, for clients whose
   // screen has something under the bubble they need to reach. In-memory only:
@@ -317,7 +342,7 @@
   // ours is persisted client-side).
   function setTucked(tucked) {
     state.tucked = tucked;
-    if (tucked && state.open) toggle(); // close the panel on the way out
+    if (tucked) closePanel(); // close the panel on the way out
     els.launcher.classList.toggle('dgtr-tucked', tucked);
     els.tab.classList.toggle('dgtr-tab-on', tucked);
     els.bubble.classList.remove('dgtr-buzzing'); // don't buzz at someone who dismissed it
@@ -463,7 +488,14 @@
 
   // ── boot (never throw into the host page) ──────────────────────────────────
   function init() {
-    try { build(); } catch (e) { log('init failed', e); }
+    try {
+      build();
+    } catch (e) {
+      // Still never throw into the host page — but don't fail silently either.
+      // A half-built widget is exactly the state where the close button ends up
+      // dead, and log() is a no-op unless debug is on, so this went unseen.
+      try { console.warn('[dgtr] init failed', e); } catch (e2) {}
+    }
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
